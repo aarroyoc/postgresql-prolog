@@ -15,6 +15,7 @@
 
 :- use_module(library(lists)).
 :- use_module(library(charsio)).
+:- use_module(library(dcgs)).
 
 :- use_module('types').
 
@@ -23,31 +24,27 @@
 
 % StartupMessage
 startup_message(User, Database, Bytes) :-
-    int32(196608, B1),
+    int32(196608, B1), % Version
     pstring("user", B2),
     pstring(User, B3),
     pstring("database", B4),
     pstring(Database, B5),
-    append(B1, B2, B12),
-    append(B3, B4, B34),
-    append(B12, B34, B1234),
-    append(B1234, B5, B12345),
-    append(B12345, [0], B),
-    length(B, L),
+    phrase((B1, B2, B3, B4, B5, [0]), Bs),
+    length(Bs, L),
     BytesLength is L + 4,
     int32(BytesLength, B0),
-    append(B0, B, Bytes).
+    append(B0, Bs, Bytes).
 
 % AuthenticationMD5Password
 auth_message(md5, Salt, Bytes) :-
-    Bytes = [82,_,_,_,_|Bytes0],
+    Bytes = [82,_,_,_,_|Bytes0], % Byte R
     Bytes0 = [B7, B6, B5, B4, B3, B2, B1, B0],
     int32(5, [B7, B6, B5, B4]),
     Salt = [B3, B2, B1, B0].
 
 % AuthenticationCleartextPassword
 auth_message(password, Bytes) :-
-    Bytes = [82,_,_,_,_|Bytes0],
+    Bytes = [82,_,_,_,_|Bytes0], % Byte R
     Bytes0 = [B3, B2, B1, B0],
     int32(3, [B3, B2, B1, B0]).
 
@@ -61,7 +58,7 @@ password_message(Password, Bytes) :-
 
 % AuthenticationOk
 auth_ok_message(Bytes) :-
-    Bytes = [82,0,0,0,8,0,0,0,0].
+    Bytes = [82,0,0,0,8,0,0,0,0]. % Byte R
 
 % Query
 query_message(Query, Bytes) :-
@@ -73,7 +70,7 @@ query_message(Query, Bytes) :-
 
 % ErrorResponse
 error_message(Error, Bytes) :-
-    Bytes = [69,_,_,_,_,B0|Bytes0],
+    Bytes = [69,_,_,_,_,B0|Bytes0], % Byte E
     (B0 = 0 ->
         Error = "No error message"
     ;   pstring(Error, Bytes0)
@@ -89,7 +86,7 @@ empty_query_message(Bytes) :-
 
 % CommandComplete
 command_complete_message(Bytes) :- 
-    Bytes = [67|_].
+    Bytes = [67|_]. % Byte C
 
 % RowDescription
 row_description_message(Columns, Bytes) :-
@@ -119,7 +116,7 @@ get_fields([], 0, _).
 get_fields([Column|Columns], Fields, Bytes) :-
     Bytes = [B3, B2, B1, B0|Bytes0],
     int32(Length, [B3, B2, B1, B0]),
-    Length = 4294967295,
+    Length = 4294967295, % -1
     Column = null,
     Fields0 is Fields - 1,
     get_fields(Columns, Fields0, Bytes0).
@@ -127,7 +124,7 @@ get_fields([Column|Columns], Fields, Bytes) :-
 get_fields([Column|Columns], Fields, Bytes) :-
     Bytes = [B3, B2, B1, B0|Bytes0],
     int32(Length, [B3, B2, B1, B0]),
-    Length \= 4294967295,
+    Length \= 4294967295, % -1
     take(Length, Bytes0, ColumnBytes, NewBytes),
     chars_utf8bytes(Column, ColumnBytes),
     Fields0 is Fields - 1,
@@ -139,4 +136,4 @@ take(N, Bytes, Bytes0, Bytes1) :-
 
 % ReadyForQuery
 ready_for_query_message(Bytes) :-
-    Bytes = [90|_].
+    Bytes = [90|_]. % Byte Z
