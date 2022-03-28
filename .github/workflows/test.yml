@@ -29,7 +29,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v3
       - name: Checkout Scryer Prolog
-        uses actions/checkout@v3
+        uses: actions/checkout@v3
 	with:
 	  repository: mthom/scryer-prolog
 	  path: scryer-prolog
