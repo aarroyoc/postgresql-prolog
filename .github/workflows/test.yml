@@ -6,7 +6,7 @@ jobs:
     runs-on: ubuntu-20.04
     services:
       postgres:
-        image: postgres:13.4-alpine
+        image: postgres:14.0-alpine
         env:
           POSTGRES_USER: postgres
           POSTGRES_PASSWORD: postgres
@@ -26,15 +26,21 @@ jobs:
           toolchain: stable
           profile: minimal
           components: cargo
+      - name: Checkout
+        uses: actions/checkout@v3
+      - name: Checkout Scryer Prolog
+        uses actions/checkout@v3
+	with:
+	  repository: mthom/scryer-prolog
+	  path: scryer-prolog
+      - name: Compile Scryer Prolog
+        run: cargo build --release
+	working-directory: scryer-prolog
       - name: Install Scryer Prolog
-        uses: logtalk-actions/setup-scryer-prolog@master
-        with:
-          scryer-prolog-version: latest
+        run: sudo cp scryer-prolog/target/release/scryer-prolog /usr/bin/scryer-prolog
       - name: Install Logtalk
         uses: logtalk-actions/setup-logtalk@master
         with:
           logtalk-version: latest
-      - name: Checkout
-        uses: actions/checkout@v2
       - name: Execute tests
         run: logtalk_tester -p scryer
