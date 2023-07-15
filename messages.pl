@@ -10,12 +10,21 @@
     empty_query_message/1,
     row_description_message/2,
     data_row_message/2,
-    ready_for_query_message/1
+    ready_for_query_message/1,
+    parse_message/3,
+    parse_complete_message/1,
+    bind_message/2,
+    bind_complete_message/1,
+    execute_message/1,
+    close_message/1,
+    sync_message/1,
+    flush_message/1
 ]).
 
 :- use_module(library(lists)).
 :- use_module(library(charsio)).
 :- use_module(library(dcgs)).
+:- use_module(library(format)).
 
 :- use_module('types').
 
@@ -67,6 +76,78 @@ query_message(Query, Bytes) :-
     RealLength is L + 4,
     int32(RealLength, Bytes1),
     append([81|Bytes1], Bytes0, Bytes).
+
+% Parse
+parse_message(Query, NumberParams, Bytes) :-
+    pstring("", Bytes1),
+    pstring(Query, Bytes2),
+    int16(NumberParams, Bytes3),
+    findall(B, (length(X, NumberParams), member(N, X), N = 0, int32(N, B)), Bytes4),
+    append(Bytes4, FBytes4),
+    append([Bytes1, Bytes2, Bytes3, FBytes4], PreBytes),
+    length(PreBytes, L),
+    RealLength is L + 4,
+    int32(RealLength, Bytes0),
+    append([80|Bytes0], PreBytes, Bytes). % Byte P
+
+% ParseComplete
+parse_complete_message([49,_,_,_,_]).
+
+% Bind
+bind_message(Params, Bytes) :-
+    pstring("", Bytes1),
+    pstring("", Bytes2),
+    int16(0, Bytes3),
+    length(Params, NumberParams),
+    int16(NumberParams, Bytes4),
+    bind_message_params_bytes(Params, [], Bytes5),
+    append([Bytes1, Bytes2, Bytes3, Bytes4, Bytes5], PreBytes),
+    length(PreBytes, L),
+    RealLength is L + 4,
+    int32(RealLength, Bytes0),
+    append([66|Bytes0], PreBytes, Bytes). % Byte B
+
+bind_message_params_bytes([], B, B).
+bind_message_params_bytes([null|Params], Bytes0, Bytes) :-
+    int32(-1, B1),
+    int16(0, B2),
+    append([B1, B2], B),
+    append(Bytes0, B, Bytes1),
+    bind_message_params_bytes(Params, Bytes1, Bytes).
+
+bind_message_params_bytes([Param|Params], Bytes0, Bytes) :-
+    chars_utf8bytes(Param, B2),
+    length(B2, L),
+    int32(L, B1),
+    int16(0, B3),
+    append([B1, B2, B3], B),
+    append(Bytes0, B, Bytes1),
+    bind_message_params_bytes(Params, Bytes1, Bytes).
+
+% BindComplete
+bind_complete_message([50,_,_,_,_]).
+
+% Execute
+execute_message(Bytes) :-
+    int32(9, B1),
+    pstring("", B2),
+    int32(0, B3),
+    append([[69|B1], B2, B3], Bytes).
+
+% Close
+close_message(Bytes) :-
+    int32(6, B1),
+    B2 = [83],
+    pstring("", B3),
+    append([[67|B1], B2, B3], Bytes).
+
+% Sync
+sync_message([83|B]) :-
+    int32(4, B).
+
+% Flush
+flush_message([72|B]) :-
+    int32(4, B).
 
 % ErrorResponse
 error_message(Error, Bytes) :-
