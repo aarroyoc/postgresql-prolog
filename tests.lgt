@@ -1,4 +1,5 @@
 :- use_module('postgresql').
+:- use_module('sql_query').
 
 :- object(tests, extends(lgtunit)).
 
@@ -42,6 +43,21 @@
 	postgresql:query(Connection, "UPDATE test_table SET name = 'test2' WHERE id = 1", ok),
 	postgresql:query(Connection, "SELECT * FROM test_table WHERE name = $1", ["test"], Rows2),
 	Rows2 = data([]).
+
+    test(sql_query_simple) :-
+        sql_query:sql_query([select(title,post), from(posts)], "SELECT title,post FROM posts", []).
+
+    test(sql_query) :-
+        postgresql:connect("postgres", "postgres", '127.0.0.1', 5432, "postgres", Connection),
+	postgresql:query(Connection, "DROP TABLE IF EXISTS test_table", ok),
+	postgresql:query(Connection, "CREATE TABLE test_table (id serial, name text)", ok),
+	postgresql:query(Connection, "INSERT INTO test_table (name) VALUES ('test')", ok),
+	postgresql:sql(Connection, [select(id, name), from(test_table), where(name = "test")], Rows),
+	Rows = data([["1", "test"]]),
+	postgresql:query(Connection, "UPDATE test_table SET name = 'test2' WHERE id = 1", ok),
+	postgresql:sql(Connection, [select(id, name), from(test_table), where(name = "test")], Rows2),
+	Rows2 = data([]).
+
 
 
 

@@ -1,10 +1,12 @@
-:- module(postgresql, [connect/6, query/3, query/4]).
+:- module(postgresql, [connect/6, query/3, query/4, sql/3]).
 
 :- use_module(library(lists)).
 :- use_module(library(charsio)).
 :- use_module(library(sockets)).
 
+
 :- use_module('messages').
+:- use_module('sql_query').
 :- use_module('types').
 
 connect(User, Password, Host, Port, Database, postgresql(Stream)) :-
@@ -179,3 +181,11 @@ put_bytes(Stream, [Byte|Bytes]) :-
     put_byte(Stream, Byte),
     put_bytes(Stream, Bytes),
     !.
+
+sql(Connection, Query, Result) :-
+    sql_query(Query, TextQuery, Vars),
+    keysort(Vars, SortedVars),
+    maplist(pair_value, SortedVars, QueryVars),
+    query(Connection, TextQuery, QueryVars, Result).
+
+pair_value(_-B, B).
