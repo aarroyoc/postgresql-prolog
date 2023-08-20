@@ -101,7 +101,7 @@ bind_message(Params, Bytes) :-
     length(Params, NumberParams),
     int16(NumberParams, Bytes4),
     bind_message_params_bytes(Params, [], Bytes5),
-    append([Bytes1, Bytes2, Bytes3, Bytes4, Bytes5], PreBytes),
+    append([Bytes1, Bytes2, Bytes3, Bytes4, Bytes5, Bytes3], PreBytes),
     length(PreBytes, L),
     RealLength is L + 4,
     int32(RealLength, Bytes0),
@@ -109,9 +109,7 @@ bind_message(Params, Bytes) :-
 
 bind_message_params_bytes([], B, B).
 bind_message_params_bytes([null|Params], Bytes0, Bytes) :-
-    int32(-1, B1),
-    int16(0, B2),
-    append([B1, B2], B),
+    int32(-1, B),
     append(Bytes0, B, Bytes1),
     bind_message_params_bytes(Params, Bytes1, Bytes).
 
@@ -119,8 +117,7 @@ bind_message_params_bytes([Param|Params], Bytes0, Bytes) :-
     chars_utf8bytes(Param, B2),
     length(B2, L),
     int32(L, B1),
-    int16(0, B3),
-    append([B1, B2, B3], B),
+     append([B1, B2], B),
     append(Bytes0, B, Bytes1),
     bind_message_params_bytes(Params, Bytes1, Bytes).
 

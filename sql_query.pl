@@ -143,6 +143,15 @@ sql_cond((A;B), Vars0, Vars) -->
     sql_cond(B, Vars1, Vars),
     ")".
 
+sql_cond((\+ A), Vars0, Vars) -->
+    "NOT (",
+    sql_cond(A, Vars0, Vars),
+    ")".
+
+sql_cond(is_null(A), Vars0, Vars) -->
+    { sql_var(A, VarA, Vars0, Vars) },    
+    format_("~w IS NULL", [VarA]).
+
 sql_cond(A = B, Vars0, Vars) -->
     { sql_var(A, VarA, Vars0, Vars1) },
     { sql_var(B, VarB, Vars1, Vars) },

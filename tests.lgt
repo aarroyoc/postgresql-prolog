@@ -105,8 +105,8 @@
 
     test(sql_query_or) :-
         sql_query:sql_query(
-	    [select(title), from(posts), where((lang = "es";lang='NULL')), order_by(desc(date), asc(title))],
-	    "SELECT title FROM posts WHERE (lang = $1) OR (lang = NULL) ORDER BY date DESC,title ASC",
+	    [select(title), from(posts), where((lang = "es";is_null(lang))), order_by(desc(date), asc(title))],
+	    "SELECT title FROM posts WHERE (lang = $1) OR (lang IS NULL) ORDER BY date DESC,title ASC",
 	    [1-"es"]
 	).
 
@@ -156,7 +156,19 @@
 	postgresql:sql(Connection, [select(id, name), from(test_table), where(name = "test")], Rows2),
 	Rows2 = data([]).
 
-
+    test(sql_query_2) :-
+        postgresql:connect("postgres", "postgres", '127.0.0.1', 5432, "postgres", Connection),
+	postgresql:query(Connection, "DROP TABLE IF EXISTS famous", ok),		
+	postgresql:query(Connection, "DROP TABLE IF EXISTS country", ok),
+	postgresql:query(Connection, "CREATE TABLE country (iso_code varchar(2) PRIMARY KEY, name text)", ok),
+	postgresql:query(Connection, "CREATE TABLE famous (id serial PRIMARY KEY, name text, country varchar(2) REFERENCES country(iso_code), year int)", ok),
+	postgresql:sql(Connection, [insert_into(country, [iso_code, name]), values("ES", "España")], data([])),
+	postgresql:sql(Connection, [insert_into(country, [iso_code, name]), values("PT", "Portugal")], data([])),
+	postgresql:sql(Connection, [insert_into(famous, [name, country, year]), values("Miguel de Cervantes", "ES", 1547)], data([])),
+	postgresql:sql(Connection, [insert_into(famous, [name, country, year]), values("Magallanes", "PT", 1480)], data([])),
+	postgresql:sql(Connection, [insert_into(famous, [name, country, year]), values("Picasso", "ES", 1881)], data([])),
+	postgresql:sql(Connection, [select('famous.name','country.name'),from(famous),join(country),on('famous.country' = 'country.iso_code'),where((year > 1500,year < 2000)),order_by(asc(year))], Result),
+	Result = data([["Miguel de Cervantes", "España"], ["Picasso", "España"]]).
 
 
 :- end_object.

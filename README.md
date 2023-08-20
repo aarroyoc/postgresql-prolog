@@ -58,8 +58,8 @@ SQL = "SELECT title FROM posts WHERE lang = $1 ORDER BY date DESC OFFSET 10 ROWS
 QueryDSL = [select('posts.title','author.name'), from(posts), join(author), on('author.author_id' = 'posts.author_id')]
 SQL = "SELECT posts.title,author.name FROM posts INNER JOIN author ON author.author_id = posts.author_id"
 
-QueryDSL = [select(title), from(posts), where((lang = "es";lang='NULL')), order_by(desc(date), asc(title))]
-SQL = "SELECT title FROM posts WHERE (lang = $1) OR (lang = NULL) ORDER BY date DESC,title ASC"
+QueryDSL = [select(title), from(posts), where((lang = "es";is_null(lang))), order_by(desc(date), asc(title))]
+SQL = "SELECT title FROM posts WHERE (lang = $1) OR (lang IS NULL) ORDER BY date DESC,title ASC"
 
 QueryDSL = [insert_into(test_table, [name]), values("test")]
 SQL = "INSERT INTO test_table (name) VALUES ($1)"
