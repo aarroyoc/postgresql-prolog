@@ -67,7 +67,7 @@ SQL = "INSERT INTO test_table (name) VALUES ($1)"
 QueryDSL = [update(post),set((lang = "es", price = 99)),where(lang = "fr")]
 SQL = "UPDATE post SET lang = $1,price = 99 WHERE lang = $2"
 
-```.
+```
 
 The Result var contains the result exection of the query. It can be:
 
@@ -94,6 +94,7 @@ data(ColumnDescription, Rows) is returned when a query outputs a table (SELECT).
 
 ```
 query(+Connection, +QueryEscaped, +Data, -Result)
+```
 
 Executes a SQL query string over a connection. In contrast to `query/3`, here the query needs to be a template and the vars are passed in the Data list. This is safer than `query/3`. Result is the same as `sql/3`.
 
