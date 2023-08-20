@@ -1,5 +1,5 @@
-:- use_module('postgresql').
-:- use_module('sql_query').
+:- use_module(postgresql).
+:- use_module(sql_query).
 
 :- object(tests, extends(lgtunit)).
 
@@ -47,14 +47,112 @@
     test(sql_query_simple) :-
         sql_query:sql_query([select(title,post), from(posts)], "SELECT title,post FROM posts", []).
 
+    test(sql_query_group_by) :-
+        sql_query:sql_query(
+	    [select(sum(visits)), from(posts), where(lang = "es"), group_by(title)],
+	    "SELECT sum(visits) FROM posts WHERE lang = $1 GROUP BY title",
+	    [1-"es"]
+	).
+
+    test(sql_query_order_by) :-
+        sql_query:sql_query(
+	    [select(title,content), from(posts), order_by(desc(date), asc(title))],
+	    "SELECT title,content FROM posts ORDER BY date DESC,title ASC",
+	    []
+	).
+
+    test(sql_query_join) :-
+        sql_query:sql_query(
+	    [select('posts.title','author.name'), from(posts), join(author), on('author.author_id' = 'posts.author_id')],
+	    "SELECT posts.title,author.name FROM posts INNER JOIN author ON author.author_id = posts.author_id",
+	    []
+	).
+
+    test(sql_query_join_where) :-
+        sql_query:sql_query(
+	    [select('posts.title','author.name'), from(posts), join(author), on('author.author_id' = 'posts.author_id'), where(lang = "es")],
+	    "SELECT posts.title,author.name FROM posts INNER JOIN author ON author.author_id = posts.author_id WHERE lang = $1",
+	    [1-"es"]
+	).
+
+    test(sql_query_join_using) :-
+        sql_query:sql_query(
+	    [select('posts.title','author.name'), from(posts), join(author), using(author_id)],
+	    "SELECT posts.title,author.name FROM posts INNER JOIN author USING (author_id)",
+	    []
+	).
+
+    test(full_join) :-
+        sql_query:sql_query(
+	    [select('posts.title','author.name'), from(posts), full_join(author), using(author_id)],
+	    "SELECT posts.title,author.name FROM posts FULL OUTER JOIN author USING (author_id)",
+	    []
+	).
+
+    test(multiple_join) :-
+        sql_query:sql_query(
+	    [select('posts.title','author.name'), from(posts), full_join(author), using(author_id), join(comment), on('comment.id' = 5)],
+	    "SELECT posts.title,author.name FROM posts FULL OUTER JOIN author USING (author_id) INNER JOIN comment ON comment.id = 5",
+	    []
+	).
+
+    test(natural_join) :-
+        sql_query:sql_query(
+	    [select('posts.title','author.name'), from(posts), natural_join(author), where(lang = "es"), order_by(desc(date))],
+	    "SELECT posts.title,author.name FROM posts NATURAL JOIN author WHERE lang = $1 ORDER BY date DESC",
+	    [1-"es"]
+	).
+
+    test(sql_query_or) :-
+        sql_query:sql_query(
+	    [select(title), from(posts), where((lang = "es";lang='NULL')), order_by(desc(date), asc(title))],
+	    "SELECT title FROM posts WHERE (lang = $1) OR (lang = NULL) ORDER BY date DESC,title ASC",
+	    [1-"es"]
+	).
+
+    test(fetch_first) :-
+        sql_query:sql_query(
+	    [select(title), from(posts), where(lang = "es"), order_by(desc(date)), offset(10), fetch_first(5, only)],
+	    "SELECT title FROM posts WHERE lang = $1 ORDER BY date DESC OFFSET 10 ROWS FETCH FIRST 5 ROWS ONLY",
+	    [1-"es"]
+	).
+
+    test(insert_into) :-
+        sql_query:sql_query(
+	    [insert_into(posts, [title, content]), values("Mi nuevo Libro", "Luna de Plutón")],
+	    "INSERT INTO posts (title,content) VALUES ($1,$2)",
+	    [2-"Luna de Plutón", 1-"Mi nuevo Libro"]
+	).
+
+    test(sql_query_update) :-
+        sql_query:sql_query(
+	    [update(post),set((lang = "es", price = 99))],
+	    "UPDATE post SET lang = $1,price = 99",
+	    [1-"es"]
+	).
+
+    test(sql_query_update) :-
+        sql_query:sql_query(
+	    [update(post),set((lang = "es", price = 99)),where(lang = "fr")],
+	    "UPDATE post SET lang = $1,price = 99 WHERE lang = $2",
+	    [2-"fr", 1-"es"]
+	).
+
+    test(sql_query_delete) :-
+        sql_query:sql_query(
+	    [delete(post),where(lang = "fr")],
+	    "DELETE post WHERE lang = $1",
+	    [1-"fr"]
+	).
+
     test(sql_query) :-
         postgresql:connect("postgres", "postgres", '127.0.0.1', 5432, "postgres", Connection),
 	postgresql:query(Connection, "DROP TABLE IF EXISTS test_table", ok),
 	postgresql:query(Connection, "CREATE TABLE test_table (id serial, name text)", ok),
-	postgresql:query(Connection, "INSERT INTO test_table (name) VALUES ('test')", ok),
+	postgresql:sql(Connection, [insert_into(test_table, [name]), values("test")], data([])),
 	postgresql:sql(Connection, [select(id, name), from(test_table), where(name = "test")], Rows),
 	Rows = data([["1", "test"]]),
-	postgresql:query(Connection, "UPDATE test_table SET name = 'test2' WHERE id = 1", ok),
+	postgresql:sql(Connection, [update(test_table), set(name = "test2"), where(id = 1)], data([])),
 	postgresql:sql(Connection, [select(id, name), from(test_table), where(name = "test")], Rows2),
 	Rows2 = data([]).
 
