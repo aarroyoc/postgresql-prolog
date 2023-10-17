@@ -166,7 +166,7 @@
 	postgresql:sql(Connection, [insert_into(country, [iso_code, name]), values("PT", "Portugal")], data([])),
 	postgresql:sql(Connection, [insert_into(famous, [name, country, year]), values("Miguel de Cervantes", "ES", 1547)], data([])),
 	postgresql:sql(Connection, [insert_into(famous, [name, country, year]), values("Magallanes", "PT", 1480)], data([])),
-	postgresql:sql(Connection, [insert_into(famous, [name, country, year]), values("Picasso", "ES", 1881)], data([])),
+	postgresql:sql(Connection, [insert_into(famous, [name, country, year]), values("Picasso", "ES", 1881), returning(name, country)], data([["Picasso", "ES"]])),
 	postgresql:sql(Connection, [select('famous.name','country.name'),from(famous),join(country),on('famous.country' = 'country.iso_code'),where((year > 1500,year < 2000)),order_by(asc(year))], Result),
 	Result = data([["Miguel de Cervantes", "España"], ["Picasso", "España"]]).
 

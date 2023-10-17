@@ -269,12 +269,25 @@ sql_query_insert([insert_into(Table, Cols)|Values], Vars) -->
     ") ",
     sql_query_insert_values(Values, Vars).
 
+sql_query_insert_values([Values0|Next], Vars) -->
+    { Values0 =.. [values|Values] },
+    "VALUES (",
+    { values_args(Values, Args, [], Vars) },
+    quoted_comma_separated_list(Args),
+    ")",
+    sql_query_insert_returning(Next).
+
 sql_query_insert_values([Values0], Vars) -->
     { Values0 =.. [values|Values] },
     "VALUES (",
     { values_args(Values, Args, [], Vars) },
     quoted_comma_separated_list(Args),
     ")".
+
+sql_query_insert_returning([Returning0]) -->
+    { Returning0 =.. [returning|Columns] },
+    "RETURNING ",
+    quoted_comma_separated_list(Columns).
 
 values_args([], [], X, X).
 values_args([Value|Values], [Arg|Args], Vars0, Vars) :-

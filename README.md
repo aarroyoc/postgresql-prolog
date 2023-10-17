@@ -45,6 +45,7 @@ Items of the DSL:
 * `fetch_first(N, type)` - equivalent to `FETCH FIRST N ROWS type`. Type can be `only (ONLY)` or `with_ties (WITH TIES)`.
 * `insert_into(table, [col1, col2,...])` - equivalent to `INSERT INTO table (col1, col2, ...)`. Must be followed by `values`.
 * `values(val1, val2, ...)` - equivalent to `VALUES (val1, val2, ...)`. Strings here are escaped so it's **safe**.
+* `returning(col1, col2, ...)` equivalent to `RETURNING col1, col2`.
 * `update(table)` - equivalent to `UPDATE table`. Must be followed by `set`
 * `set(Sets)` - equivalent to `SET Col1 = Val1, ...`. Similar to WHERE but only = is allowed. Optionally, you can add a `where+` after a `set`.
 * `delete(table)` - equivalent to `DELETE table`. Must be followed by `where`.
