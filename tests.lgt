@@ -141,7 +141,7 @@
     test(sql_query_delete) :-
         sql_query:sql_query(
 	    [delete(post),where(lang = "fr")],
-	    "DELETE post WHERE lang = $1",
+	    "DELETE FROM post WHERE lang = $1",
 	    [1-"fr"]
 	).
 

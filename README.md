@@ -48,7 +48,7 @@ Items of the DSL:
 * `returning(col1, col2, ...)` equivalent to `RETURNING col1, col2`.
 * `update(table)` - equivalent to `UPDATE table`. Must be followed by `set`
 * `set(Sets)` - equivalent to `SET Col1 = Val1, ...`. Similar to WHERE but only = is allowed. Optionally, you can add a `where+` after a `set`.
-* `delete(table)` - equivalent to `DELETE table`. Must be followed by `where`.
+* `delete(table)` - equivalent to `DELETE FROM table`. Must be followed by `where`.
 
 Examples:
 

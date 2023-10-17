@@ -329,7 +329,7 @@ sql_set(A = B, Vars0, Vars) -->
 % DELETE
 
 sql_query_delete([delete(Table)|Rest], Vars) -->
-    "DELETE ",
+    "DELETE FROM ",
     format_("~w", [Table]),
     " ",
     sql_query_delete_where(Rest, Vars).
