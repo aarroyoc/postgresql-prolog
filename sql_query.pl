@@ -149,7 +149,7 @@ sql_cond((\+ A), Vars0, Vars) -->
     ")".
 
 sql_cond(is_null(A), Vars0, Vars) -->
-    { sql_var(A, VarA, Vars0, Vars) },    
+    { sql_var(A, VarA, Vars0, Vars) },
     format_("~w IS NULL", [VarA]).
 
 sql_cond(A = B, Vars0, Vars) -->
@@ -272,10 +272,11 @@ sql_query_insert([insert_into(Table, Cols)|Values], Vars) -->
 sql_query_insert_values([Values0|Next], Vars) -->
     { Values0 =.. [values|Values] },
     "VALUES (",
-    { values_args(Values, Args, [], Vars) },
+    { values_args(Values, Args, [], Vars0) },
     quoted_comma_separated_list(Args),
-    ")",
-    sql_query_insert_returning(Next).
+    ") ",
+    sql_query_insert_on_conflict(Next, Vars1),
+    { append(Vars0, Vars1, Vars) }.
 
 sql_query_insert_values([Values0], Vars) -->
     { Values0 =.. [values|Values] },
@@ -283,6 +284,26 @@ sql_query_insert_values([Values0], Vars) -->
     { values_args(Values, Args, [], Vars) },
     quoted_comma_separated_list(Args),
     ")".
+
+sql_query_insert_on_conflict([Values0|Next], Vars) -->
+    { Values0 =.. [on_conflict_do_update|Cols] },
+    "ON CONFLICT (",
+    quoted_comma_separated_list(Cols),
+    ") DO UPDATE ",
+    sql_query_insert_do_update_set(Next, Vars).
+
+sql_query_insert_on_conflict(Rest, []) -->
+    sql_query_insert_returning(Rest).
+
+sql_query_insert_do_update_set([set(Cond)], Vars) -->
+    "SET ",
+    sql_set(Cond, [], Vars).
+
+sql_query_insert_do_update_set([set(Cond) | Rest], Vars) -->
+    "SET ",
+    sql_set(Cond, [], Vars),
+    " ",
+    sql_query_insert_returning(Rest).
 
 sql_query_insert_returning([Returning0]) -->
     { Returning0 =.. [returning|Columns] },
@@ -293,7 +314,7 @@ values_args([], [], X, X).
 values_args([Value|Values], [Arg|Args], Vars0, Vars) :-
     sql_var(Value, Arg, Vars0, Vars1),
     values_args(Values, Args, Vars1, Vars).
-    
+
 % UPDATE
 
 sql_query_update([update(Table)|Rest], Vars) -->

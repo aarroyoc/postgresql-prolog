@@ -6,7 +6,7 @@
     test(trivial) :- true.
     test(password_connection_ok) :- postgresql:connect("postgres", "postgres", '127.0.0.1', 5432, "postgres", _).
     fails(password_connection_fail) :- postgresql:connect("postgres", "invalid", '127.0.0.1', 5432, "postgres", _).
-    
+
     test(create_table_insert_and_select) :-
         postgresql:connect("postgres", "postgres", '127.0.0.1', 5432, "postgres", Connection),
         postgresql:query(Connection, "DROP TABLE IF EXISTS test_table", ok),
@@ -121,6 +121,13 @@
         sql_query:sql_query(
 	    [insert_into(posts, [title, content]), values("Mi nuevo Libro", "Luna de Plutón")],
 	    "INSERT INTO posts (title,content) VALUES ($1,$2)",
+	    [2-"Luna de Plutón", 1-"Mi nuevo Libro"]
+	).
+
+    test(insert_into_on_conflict_do_update) :-
+        sql_query:sql_query(
+	    [insert_into(posts, [title, content]), values("Mi nuevo Libro", "Luna de Plutón"), on_conflict_do_update(title), set(content='EXCLUDED.content')],
+	    "INSERT INTO posts (title,content) VALUES ($1,$2) ON CONFLICT (title) DO UPDATE SET content = EXCLUDED.content",
 	    [2-"Luna de Plutón", 1-"Mi nuevo Libro"]
 	).
 
