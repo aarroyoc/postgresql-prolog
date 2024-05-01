@@ -131,6 +131,20 @@
 	    [2-"Luna de Plutón", 1-"Mi nuevo Libro"]
 	).
 
+    test(insert_into_on_conflict_do_nothing) :-
+        sql_query:sql_query(
+	    [insert_into(posts, [title, content]), values("Mi nuevo Libro", "Luna de Plutón"), on_conflict_do_nothing],
+	    "INSERT INTO posts (title,content) VALUES ($1,$2) ON CONFLICT DO NOTHING",
+	    [2-"Luna de Plutón", 1-"Mi nuevo Libro"]
+	).
+
+    test(insert_into_on_conflict_do_nothing_with_cols) :-
+        sql_query:sql_query(
+	    [insert_into(posts, [title, content]), values("Mi nuevo Libro", "Luna de Plutón"), on_conflict_do_nothing(title)],
+	    "INSERT INTO posts (title,content) VALUES ($1,$2) ON CONFLICT (title) DO NOTHING",
+	    [2-"Luna de Plutón", 1-"Mi nuevo Libro"]
+	).
+
     test(sql_query_update) :-
         sql_query:sql_query(
 	    [update(post),set((lang = "es", price = 99))],

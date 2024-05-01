@@ -292,6 +292,26 @@ sql_query_insert_on_conflict([Values0|Next], Vars) -->
     ") DO UPDATE ",
     sql_query_insert_do_update_set(Next, Vars).
 
+sql_query_insert_on_conflict([Values0|Next], []) -->
+    { Values0 =.. [on_conflict_do_nothing|Cols] },
+    "ON CONFLICT (",
+    quoted_comma_separated_list(Cols),
+    ") DO NOTHING ",
+    sql_query_insert_returning(Next).
+
+sql_query_insert_on_conflict([on_conflict_do_nothing|Next], []) -->
+    "ON CONFLICT DO NOTHING ",
+    sql_query_insert_returning(Next).
+
+sql_query_insert_on_conflict([Values0], []) -->
+    { Values0 =.. [on_conflict_do_nothing|Cols] },
+    "ON CONFLICT (",
+    quoted_comma_separated_list(Cols),
+    ") DO NOTHING".
+
+sql_query_insert_on_conflict([on_conflict_do_nothing], []) -->
+    "ON CONFLICT DO NOTHING".
+
 sql_query_insert_on_conflict(Rest, []) -->
     sql_query_insert_returning(Rest).
 
