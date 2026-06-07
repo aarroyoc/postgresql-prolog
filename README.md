@@ -7,7 +7,7 @@ A Prolog library to connect to PostgreSQL databases
 
 # Installation
 
-The library itself are just four Prolog files (postgresql.pl, sql_query.pl, messages.pl and types.pl). They need to be in the same folder. An easy way to install this library in your project is copying that files. Other way is using Git submodules to get this whole folder, and load the postgresql.pl file from there.
+The library itself is just five Prolog files (`postgresql.pl`, `sql_query.pl`, `messages.pl`, `types.pl`, `scram.pl`). They need to be in the same folder. An easy way to install this library in your project is copying those files. Another way is using Git submodules to get this whole folder, and load the `postgresql.pl` file from there.
 
 ```
 git submodule add https://github.com/aarroyoc/postgresql-prolog postgresql
@@ -20,7 +20,12 @@ The library provides four predicates: `connect/6`, `sql/3`, `query/3` and `query
 ```
 connect(+User, +Password, +Host, +Port, +Database, -Connection)
 ```
-Connects to a PostgreSQL server and tries to authenticate using `password` scheme. This is the only authentication method supported right now. Please, note that this auth method is not the default in some PostgreSQL setups, you changes are needed. If you're running PostgreSQL in Docker, you need to set the environment variable `POSTGRES_HOST_AUTH_METHOD` to `password`.
+Connects to a PostgreSQL server. Authentication method is selected by the server. The library currently supports:
+
+* `password` — AuthenticationCleartextPassword (`R(3)`).
+* `SCRAM-SHA-256` — SASL authentication (`R(10)/R(11)/R(12)`), per RFC 5802 and RFC 7677. This is the default in PostgreSQL 14+ and required by most managed Postgres providers.
+
+No server-side reconfiguration is needed for default-installed PostgreSQL 10+ instances.
 
 ```
 sql(+Connection, +QueryDSL, -Result)

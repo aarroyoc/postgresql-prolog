@@ -3,23 +3,64 @@
 :- use_module(library(lists)).
 :- use_module(library(charsio)).
 :- use_module(library(sockets)).
+:- use_module(library(reif)).
 
 
-:- use_module('messages').
-:- use_module('sql_query').
-:- use_module('types').
+:- use_module(messages).
+% scram.pl pulls in library(crypto), whose eager load makes the Logtalk
+% test suite hang under Scryer 0.9.4 + Logtalk 3.70.0 (the pair this repo
+% pins for that job, since Scryer >= 0.10 dropped the Logtalk adapter).
+% Load scram lazily, but anchor its path at compile time so the resolution
+% does not depend on the consumer's runtime CWD (a regression we hit when
+% this package is vendored as a submodule -- see
+% tests/scram_handshake_cwd_independence_test.pl).
+:- use_module(sql_query).
+:- use_module(types).
+
+:- dynamic(scram_module_path/1).
+
+capture_scram_module_path :-
+    catch(
+        ( prolog_load_context(directory, Dir),
+          atom_concat(Dir, '/scram.pl', Path),
+          assertz(scram_module_path(Path)) ),
+        _,
+        true
+    ).
+:- initialization(capture_scram_module_path).
 
 connect(User, Password, Host, Port, Database, postgresql(Stream)) :-
-    socket_client_open(Host:Port, Stream, [type(binary)]),
+    (   atom(Host)
+    ->  HostAtom = Host
+    ;   atom_chars(HostAtom, Host) ),
+    socket_client_open(HostAtom:Port, Stream, [type(binary)]),
     startup_message(User, Database, BytesStartup),
     put_bytes(Stream, BytesStartup),
+    do_authenticate(Stream, User, Password),
+    flush_bytes(Stream).
+
+% Dispatch on the server's AuthenticationRequest method.
+do_authenticate(Stream, User, Password) :-
     get_bytes(Stream, BytesAuth),
-    auth_message(password, BytesAuth),
+    auth_method(BytesAuth, Method),
+    handle_auth(Method, Stream, User, Password).
+
+handle_auth(ok, _, _, _).
+handle_auth(password, Stream, _, Password) :-
     password_message(Password, BytesPassword),
     put_bytes(Stream, BytesPassword),
     get_bytes(Stream, BytesOk),
-    auth_ok_message(BytesOk),
-    flush_bytes(Stream).
+    auth_ok_message(BytesOk).
+handle_auth(sasl(Mechanisms), Stream, User, Password) :-
+    scram_module_path(Path),
+    use_module(Path, [do_scram_sha_256_after_offer/3]),
+    if_(memberd_t("SCRAM-SHA-256", Mechanisms),
+        ( scram:do_scram_sha_256_after_offer(Stream, User, Password),
+          get_bytes(Stream, BytesOk),
+          auth_ok_message(BytesOk)
+        ),
+        throw(unsupported_sasl_mechanisms(Mechanisms))
+    ).
 
 flush_bytes(Stream) :-
     get_bytes(Stream, Bytes),

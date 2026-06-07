@@ -1,0 +1,96 @@
+name: Test (Logtalk suite)
+on: [push]
+
+# Scryer Prolog removed Logtalk support after v0.9.x and Logtalk 3.70.0 is the
+# last release shipping the scryer adapter. The Logtalk-driven test set only
+# compiles against that pair, so this job pins both and caches the built
+# scryer-prolog v0.9.4 binary to avoid a 5+ min cargo build on every run.
+
+jobs:
+  test-logtalk:
+    runs-on: ubuntu-22.04
+    services:
+      postgres:
+        image: postgres:16.0-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: postgres
+          POSTGRES_HOST_AUTH_METHOD: password
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+    env:
+      SCRYER_VERSION: v0.9.4
+      LOGTALK_VERSION: 3.70.0
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Cache scryer-prolog ${{ env.SCRYER_VERSION }} binary
+        id: cache-scryer
+        uses: actions/cache@v5
+        with:
+          path: scryer-bin/scryer-prolog
+          key: scryer-prolog-${{ env.SCRYER_VERSION }}-${{ runner.os }}-v1
+
+      - name: Install Rust toolchain
+        if: steps.cache-scryer.outputs.cache-hit != 'true'
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Checkout Scryer Prolog ${{ env.SCRYER_VERSION }}
+        if: steps.cache-scryer.outputs.cache-hit != 'true'
+        uses: actions/checkout@v6
+        with:
+          repository: mthom/scryer-prolog
+          ref: ${{ env.SCRYER_VERSION }}
+          path: scryer-prolog
+
+      - name: Compile Scryer Prolog ${{ env.SCRYER_VERSION }}
+        if: steps.cache-scryer.outputs.cache-hit != 'true'
+        working-directory: scryer-prolog
+        run: |
+          cargo build --release
+          mkdir -p "$GITHUB_WORKSPACE/scryer-bin"
+          cp target/release/scryer-prolog "$GITHUB_WORKSPACE/scryer-bin/scryer-prolog"
+
+      - name: Install Scryer Prolog
+        run: sudo install -m 0755 scryer-bin/scryer-prolog /usr/bin/scryer-prolog
+
+      - name: First-argument indexing regression (Scryer v0.9.4 - demonstration; allowed to fail)
+        # Demonstrates the bug worked around in types.pl:11-13. The step is
+        # expected to fail on v0.9.4 (shift_* probes return solutions=[]);
+        # continue-on-error keeps the job green. The v0.10.0 counterpart in
+        # the test job asserts the regression is fixed upstream.
+        continue-on-error: true
+        run: scryer-prolog tests/indexing_regression.pl
+
+      - name: Install Logtalk ${{ env.LOGTALK_VERSION }}
+        # Inlined to avoid logtalk-actions/setup-logtalk's node16 runtime.
+        # Equivalent to: logtalk-actions/setup-logtalk with logtalk-version: ${LOGTALK_VERSION}.
+        # Extract under $RUNNER_TEMP so logtalk_tester does not pick up the
+        # upstream library/ tester.lgt files and run them all under Scryer.
+        run: |
+          cd "$RUNNER_TEMP"
+          wget -nv "https://logtalk.org/files/logtalk-${LOGTALK_VERSION}.tar.bz2"
+          tar xjf "logtalk-${LOGTALK_VERSION}.tar.bz2"
+          sudo "logtalk-${LOGTALK_VERSION}/scripts/install.sh" -p /usr/local
+          echo "LOGTALKHOME=/usr/local/share/logtalk" >> "$GITHUB_ENV"
+          echo "LOGTALKUSER=$HOME/logtalk" >> "$GITHUB_ENV"
+
+      - name: Execute Logtalk tests
+        # -t 60 bounds each test set so a Scryer hang cannot stall the job near
+        # the GitHub Actions 6h ceiling; -l 1 restricts discovery to this dir.
+        run: logtalk_tester -p scryer -o verbose -l 1 -t 60
+
+      - name: Upload Logtalk tester logs on failure
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: logtalk-tester-logs
+          path: logtalk_tester_logs/
+          if-no-files-found: ignore

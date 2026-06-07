@@ -8,7 +8,12 @@
 
 int32(Number, [B3, B2, B1, B0]) :-
     var(Number),
-    Number is (B3 << 24) + (B2 << 16) + (B1 << 8) + B0.
+    % Multiplication rather than `<<` because Scryer 0.9.4 returns integers
+    % from bitshift expressions whose representation breaks first-argument
+    % indexing on the receiving multiclause predicate (auth_method_/3).
+    % See tests/indexing_regression.pl for a reproducer; the bug is fixed
+    % in Scryer 0.10.0.
+    Number is B3 * 16777216 + B2 * 65536 + B1 * 256 + B0.
 
 int32(Number, [B3, B2, B1, B0]) :-
     integer(Number),
@@ -19,7 +24,7 @@ int32(Number, [B3, B2, B1, B0]) :-
 
 int16(Number, [B1, B0]) :-
     var(Number),
-    Number is (B1 << 8) + B0.
+    Number is B1 * 256 + B0.
 
 int16(Number, [B1, B0]) :-
     integer(Number),

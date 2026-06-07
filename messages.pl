@@ -1,7 +1,10 @@
 :- module(messages, [
     startup_message/3,
     auth_message/2,
+    auth_method/2,
     password_message/2,
+    sasl_initial_response_message/3,
+    sasl_response_message/2,
     auth_ok_message/1,
     query_message/2,
     notice_message/1,
@@ -68,6 +71,60 @@ password_message(Password, Bytes) :-
 % AuthenticationOk
 auth_ok_message(Bytes) :-
     Bytes = [82,0,0,0,8,0,0,0,0]. % Byte R
+
+% auth_method(+Bytes, -Method)
+%
+% Decodes an AuthenticationRequest message into a tagged term. Method is one of:
+%   ok                          - R(0)
+%   password                    - R(3) AuthenticationCleartextPassword
+%   md5(Salt4Bytes)             - R(5) AuthenticationMD5Password
+%   sasl(MechanismList)         - R(10) AuthenticationSASL
+%   sasl_continue(SaslBytes)    - R(11) AuthenticationSASLContinue
+%   sasl_final(SaslBytes)       - R(12) AuthenticationSASLFinal
+auth_method(Bytes, Method) :-
+    Bytes = [82,_L3,_L2,_L1,_L0,C3,C2,C1,C0|Body],
+    int32(Code, [C3,C2,C1,C0]),
+    auth_method_(Code, Body, Method).
+
+auth_method_(0,  _,    ok).
+auth_method_(3,  _,    password).
+auth_method_(5,  Salt, md5(Salt)).
+auth_method_(10, Body, sasl(Mechanisms)) :-
+    nul_terminated_strings(Body, Mechanisms).
+auth_method_(11, Body, sasl_continue(Body)).
+auth_method_(12, Body, sasl_final(Body)).
+
+% NUL-terminated UTF-8 strings, list ended by a final empty string (NUL byte alone).
+nul_terminated_strings([0], []) :- !.
+nul_terminated_strings(Bytes, [Chars|Rest]) :-
+    append(StringBytes, [0|After], Bytes),
+    \+ member(0, StringBytes),
+    !,
+    chars_utf8bytes(Chars, StringBytes),
+    nul_terminated_strings(After, Rest).
+
+% SASLInitialResponse (F)
+%   Byte1('p'), Int32(length), String(mechanism), Int32(initial-response-length), Bytes(initial-response)
+sasl_initial_response_message(Mechanism, ClientFirst, Bytes) :-
+    pstring(Mechanism, MechBytes),
+    chars_utf8bytes(ClientFirst, ClientFirstBytes),
+    length(ClientFirstBytes, ClientFirstLen),
+    int32(ClientFirstLen, ClientFirstLenBytes),
+    append(MechBytes, ClientFirstLenBytes, MechAndLen),
+    append(MechAndLen, ClientFirstBytes, PreBytes),
+    length(PreBytes, L),
+    RealLength is L + 4,
+    int32(RealLength, LengthBytes),
+    append([112|LengthBytes], PreBytes, Bytes).
+
+% SASLResponse (F)
+%   Byte1('p'), Int32(length), Bytes(client-final)
+sasl_response_message(ClientFinal, Bytes) :-
+    chars_utf8bytes(ClientFinal, ClientFinalBytes),
+    length(ClientFinalBytes, L),
+    RealLength is L + 4,
+    int32(RealLength, LengthBytes),
+    append([112|LengthBytes], ClientFinalBytes, Bytes).
 
 % Query
 query_message(Query, Bytes) :-

@@ -5,42 +5,86 @@ jobs:
   test:
     runs-on: ubuntu-22.04
     services:
-      postgres:
-        image: postgres:16.0-alpine
+      postgres-scram:
+        image: postgres:17-alpine
         env:
           POSTGRES_USER: postgres
           POSTGRES_PASSWORD: postgres
           POSTGRES_DB: postgres
-          POSTGRES_HOST_AUTH_METHOD: password
+          POSTGRES_HOST_AUTH_METHOD: scram-sha-256
+          POSTGRES_INITDB_ARGS: "--auth-host=scram-sha-256 --auth-local=scram-sha-256"
         options: >-
           --health-cmd pg_isready
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
         ports:
-          - 5432:5432
+          - 5433:5432
+    env:
+      SCRYER_VERSION: v0.10.0
     steps:
-      - name: Install Rust cargo
-        uses: actions-rs/toolchain@v1
-        with:
-          toolchain: stable
-          profile: minimal
-          components: cargo
       - name: Checkout
-        uses: actions/checkout@v3
-      - name: Checkout Scryer Prolog
-        uses: actions/checkout@v3
+        uses: actions/checkout@v6
+
+      - name: Cache scryer-prolog ${{ env.SCRYER_VERSION }} binary
+        id: cache-scryer
+        uses: actions/cache@v5
+        with:
+          path: scryer-bin/scryer-prolog
+          key: scryer-prolog-${{ env.SCRYER_VERSION }}-${{ runner.os }}-v1
+
+      - name: Install Rust toolchain
+        if: steps.cache-scryer.outputs.cache-hit != 'true'
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Checkout Scryer Prolog ${{ env.SCRYER_VERSION }}
+        if: steps.cache-scryer.outputs.cache-hit != 'true'
+        uses: actions/checkout@v6
         with:
           repository: mthom/scryer-prolog
+          ref: ${{ env.SCRYER_VERSION }}
           path: scryer-prolog
-      - name: Compile Scryer Prolog
-        run: cargo build --release
+
+      - name: Compile Scryer Prolog ${{ env.SCRYER_VERSION }}
+        if: steps.cache-scryer.outputs.cache-hit != 'true'
         working-directory: scryer-prolog
+        run: |
+          cargo build --release
+          mkdir -p "$GITHUB_WORKSPACE/scryer-bin"
+          cp target/release/scryer-prolog "$GITHUB_WORKSPACE/scryer-bin/scryer-prolog"
+
       - name: Install Scryer Prolog
-        run: sudo cp scryer-prolog/target/release/scryer-prolog /usr/bin/scryer-prolog
-      - name: Install Logtalk
-        uses: logtalk-actions/setup-logtalk@master
-        with:
-          logtalk-version: 3.70.0
-      - name: Execute tests
-        run: logtalk_tester -p scryer
+        run: sudo install -m 0755 scryer-bin/scryer-prolog /usr/bin/scryer-prolog
+
+      - name: First-argument indexing regression (Scryer v0.10.0 - must pass)
+        # Companion check for the workaround in types.pl:11-13.
+        # The bug demonstrated on v0.9.4 lives in the test-logtalk job.
+        run: scryer-prolog tests/indexing_regression.pl
+
+      - name: Execute SCRAM-SHA-256 round-trip test
+        env:
+          DATABASE_HOST: 127.0.0.1
+          DATABASE_PORT: 5433
+          DATABASE_USERNAME: postgres
+          DATABASE_PASSWORD: postgres
+          DATABASE_DB_NAME: postgres
+        run: scryer-prolog ./scram_test.pl -g 'run_test'
+
+      # Regression: a downstream consumer that vendors this package as
+      # a submodule runs scryer from the consumer's own CWD, not from
+      # this package root. Any runtime `use_module(Name)` in
+      # postgresql.pl then resolves Name against the consumer's CWD
+      # and throws existence_error(source_sink, "...") on the first
+      # SASL message. Force CWD to be /tmp so the test fails the same
+      # way a consumer would if the regression ever reappears.
+      - name: SCRAM handshake under non-package CWD (consumer simulation)
+        env:
+          DATABASE_HOST: 127.0.0.1
+          DATABASE_PORT: 5433
+          DATABASE_USERNAME: postgres
+          DATABASE_PASSWORD: postgres
+          DATABASE_DB_NAME: postgres
+        run: |
+          REPO=$(pwd)
+          cd /tmp
+          scryer-prolog "$REPO/tests/scram_handshake_cwd_independence_test.pl" -g 'run_test'
