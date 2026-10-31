@@ -4,6 +4,7 @@
 :- use_module(library(charsio)).
 :- use_module(library(sockets)).
 :- use_module(library(reif)).
+:- use_module(library(dif)).
 
 
 :- use_module(messages).
@@ -139,7 +140,7 @@ try_parse_response(Stream, BytesData, Params, Result) :-
     bind_message(Params, BindBytes),
     put_bytes(Stream, BindBytes),
     flush_message(FlushBytes),
-    put_bytes(Stream, FlushBytes),    
+    put_bytes(Stream, FlushBytes),
     get_bytes(Stream, ResponseBytes),
     try_bind_response(Stream, ResponseBytes, Result).
 
@@ -147,26 +148,42 @@ try_parse_response(Stream, BytesResponse, _, Result) :-
     error_message(Error, BytesResponse),!,
     Result = error(Error),
     sync_message(SyncBytes),
-    put_bytes(Stream, SyncBytes),    
+    put_bytes(Stream, SyncBytes),
     get_bytes(Stream, BytesEnd),
     ready_for_query_message(BytesEnd).
+
+try_parse_response(Stream, BytesResponse, Params, Result) :-
+    notice_message(BytesResponse),!,
+    get_bytes(Stream, BytesResponse0),
+    try_parse_response(Stream, BytesResponse0, Params, Result).
+
+try_parse_response(_Stream, BytesResponse, _, _) :-
+    throw(wire_silent_failure(unexpected_parse_response(BytesResponse))).
 
 try_bind_response(Stream, BytesData, Result) :-
     bind_complete_message(BytesData),!,
     execute_message(ExecuteBytes),
     put_bytes(Stream, ExecuteBytes),
     flush_message(FlushBytes),
-    put_bytes(Stream, FlushBytes),    
+    put_bytes(Stream, FlushBytes),
     get_bytes(Stream, ResponseBytes),
     try_execute_response(Stream, ResponseBytes, Result).
-    
-try_bind_response(Stream, BytesResponse, _, Result) :-
+
+try_bind_response(Stream, BytesResponse, Result) :-
     error_message(Error, BytesResponse),!,
     Result = error(Error),
     sync_message(SyncBytes),
-    put_bytes(Stream, SyncBytes),    
+    put_bytes(Stream, SyncBytes),
     get_bytes(Stream, BytesEnd),
     ready_for_query_message(BytesEnd).
+
+try_bind_response(Stream, BytesResponse, Result) :-
+    notice_message(BytesResponse),!,
+    get_bytes(Stream, BytesResponse0),
+    try_bind_response(Stream, BytesResponse0, Result).
+
+try_bind_response(_Stream, BytesResponse, _Result) :-
+    throw(wire_silent_failure(unexpected_bind_response(BytesResponse))).
 
 try_execute_response(Stream, BytesResponse, Result) :-
     ext_get_data_rows(Stream, ColumnsData, BytesResponse),
@@ -181,8 +198,18 @@ try_execute_response(Stream, BytesResponse, Result) :-
 try_execute_response(Stream, BytesResponse, Result) :-
     error_message(Error, BytesResponse),!,
     Result = error(Error),
+    sync_message(SyncBytes),
+    put_bytes(Stream, SyncBytes),
     get_bytes(Stream, BytesEnd),
     ready_for_query_message(BytesEnd).
+
+try_execute_response(Stream, BytesResponse, Result) :-
+    notice_message(BytesResponse),!,
+    get_bytes(Stream, BytesResponse0),
+    try_execute_response(Stream, BytesResponse0, Result).
+
+try_execute_response(_Stream, BytesResponse, _Result) :-
+    throw(wire_silent_failure(unexpected_execute_response(BytesResponse))).
 
 ext_get_data_rows(Stream, [], BytesData) :-
     command_complete_message(BytesData),!,
@@ -201,6 +228,12 @@ ext_get_data_rows(Stream, [Column|Columns], BytesData) :-
 
 get_bytes(Stream, Bytes) :-
     get_byte(Stream, BType),
+    continue_get_bytes(BType, Stream, Bytes).
+
+continue_get_bytes(end_of_file, _Stream, _Bytes) :-
+    throw(wire_silent_failure(stream_eof)).
+continue_get_bytes(BType, Stream, Bytes) :-
+    dif(BType, end_of_file),
     get_byte(Stream, B3),
     get_byte(Stream, B2),
     get_byte(Stream, B1),
@@ -208,11 +241,11 @@ get_bytes(Stream, Bytes) :-
     int32(Length, [B3, B2, B1, B0]),
     RemainingBytes is Length - 4,
     get_bytes(Stream, RemainingBytes, Bytes0),
-    append([BType, B3, B2, B1, B0], Bytes0, Bytes),
-    !.
+    append([BType, B3, B2, B1, B0], Bytes0, Bytes).
 
 get_bytes(_, 0, []).
 get_bytes(Stream, RemainingBytes, [B|Bytes]) :-
+    RemainingBytes > 0,
     get_byte(Stream, B),
     RemainingBytes1 is RemainingBytes - 1,
     get_bytes(Stream, RemainingBytes1, Bytes).

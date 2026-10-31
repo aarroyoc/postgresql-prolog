@@ -70,6 +70,15 @@ jobs:
           DATABASE_DB_NAME: postgres
         run: scryer-prolog ./scram_test.pl -g 'run_test'
 
+      - name: Server errors through query/4
+        env:
+          DATABASE_HOST: 127.0.0.1
+          DATABASE_PORT: 5433
+          DATABASE_USERNAME: postgres
+          DATABASE_PASSWORD: postgres
+          DATABASE_DB_NAME: postgres
+        run: timeout 60 scryer-prolog tests/query_error_test.pl -g run_test -g halt
+
       # Regression: a downstream consumer that vendors this package as
       # a submodule runs scryer from the consumer's own CWD, not from
       # this package root. Any runtime `use_module(Name)` in
